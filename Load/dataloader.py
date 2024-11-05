@@ -1,0 +1,123 @@
+import os
+import shutil
+import random
+import cv2
+from glob import glob
+from torch.utils.data import Dataset, DataLoader, Subset
+#from tqdm import tqdm
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+import matplotlib.pyplot as plt
+
+
+# arquivo dataloader.py
+class Data(Dataset):
+    def __init__(self, image_dir: str, split: str, transform=None) -> None:
+        self._image_dir = image_dir
+        self._image_path = glob(f'{image_dir}/{split}/**/*.jpg', recursive=True)
+        self._transform = transform
+        self._split = split 
+        self._targets = self._get_targets() 
+         
+             
+    def __len__(self) -> int:
+        # retornar a quantidade de dados
+        return len(self._image_path)
+
+    def __getitem__(self, idx: int) -> tuple:
+        # retornar image/labels/boox/mask...
+        image_path = self._image_path[idx]
+        image = cv2.imread(image_path)
+        target=self._targets[idx]
+         
+        if self._transform:
+            augmented_image  = self._transform(image=image)['image']
+        return augmented_image,  target
+    
+    def _get_targets(self) -> list:
+        targets = []
+        for image in self._image_path:
+            target =  os.path.basename(os.path.dirname(image))
+            targets.append(target)
+        return targets
+  
+
+class Dataloader:
+    def __init__(self, dir:str, batch_size: int, shuffle: bool, size: int, subset: int = 0, description: bool = False) -> None:
+        # construtor do dataloader
+        self._dir=dir
+        self._batch_size = batch_size
+        self._shuffle = shuffle
+        self._size = size
+        self._subset = subset
+        self._description = description
+        self._transform = self.compose()
+     
+    # criar essa estrutura data_set/treino/normal, data_set/treino/hplory e data_set/teste/normal, data_set/teste/hplory a partir de class_dir
+    def reorganize_dataset(self,class_dirs: list, class_labels: list, split_train: float) -> None:
+        url_train=f'{self._dir}/train'
+        url_test=f'{self._dir}/test'
+
+        if len(class_dirs) != len(class_labels):
+            raise ValueError("Quantidade de Diretórios diferente da quantedade de classes")
+
+        # Criar nova estrutura
+        for label in class_labels:
+            os.makedirs(f'{self._dir}/train/{label}', exist_ok=True)
+            os.makedirs(f'{self._dir}/test/{label}', exist_ok=True)
+
+        # Mover imagens 
+        for i, class_dir in enumerate(class_dirs):
+            # pega as imagens e embaralha 
+            images = glob(f'{self._dir}/{class_dir}/*.jpg')
+            random.shuffle(images)  
+
+            # Dividir as imagens em treino e teste
+            split = int(len(images) * split_train)
+            train_images = images[:split]
+            test_images = images[split:]
+        
+            for img_path in train_images:
+                shutil.move(img_path, f'{url_train}/{class_labels[i]}')
+
+            for img_path in test_images:
+                shutil.move(img_path, f'{url_test}/{class_labels[i]}')
+            # Remover pasta original
+            if not os.listdir(f'{url_train}/{class_dir}'):
+               os.rmdir(class_dir)
+        print("Nova estrutura criada")
+
+    def compose(self) -> dict: 
+        process_test = A.Compose([
+            A.Resize(height=self._size,width=self._size),
+            ToTensorV2()
+        ])
+        process_train = A.Compose([
+            A.Resize(height=self._size,width=self._size),
+            ToTensorV2()
+        ])
+        return {
+            'train':process_train,
+            'test':process_test,
+            'val':process_test
+        }
+    
+
+    def get_dataloader(self, split: str) -> DataLoader:
+        # retornar o dataloader baseado no split
+        dataset = Data(self._dir, split, self._transform[split] ) # criando uma instancia de Data 
+       
+        if self._subset:
+            dataset = Subset(dataset, range(self._subset))
+        dataloader = DataLoader(dataset, batch_size=self._batch_size, shuffle=self._shuffle)
+        
+        if self._description:
+            pass
+      
+        
+        return dataloader
+
+    def get_train_dataloader(self) -> DataLoader: return self.get_dataloader('train')
+    def get_val_dataloader(self) -> DataLoader: return self.get_dataloader('val')
+    def get_test_dataloader(self) -> DataLoader: return self.get_dataloader('test')
+
