@@ -4,6 +4,7 @@ import random
 import cv2
 from glob import glob
 from torch.utils.data import Dataset, DataLoader, Subset
+# não usei
 #from tqdm import tqdm
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
