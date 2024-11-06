@@ -94,9 +94,17 @@ class Dataloader:
             ToTensorV2()
         ])
         process_train = A.Compose([
+            A.RandomScale(scale_limit=0.5), # Artigo 1
             A.Resize(height=self._size,width=self._size),
+            A.Rotate(limit=45), # artigo 1
+            A.VerticalFlip(p=1), # artigo 1
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),# artigo 1
+            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),# artigo 3
+            A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.5),# artigo 3
             ToTensorV2()
+
         ])
+        print("entrei aqui")
         return {
             'train':process_train,
             'test':process_test,
