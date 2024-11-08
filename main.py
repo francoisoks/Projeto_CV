@@ -19,17 +19,19 @@ if __name__ == '__main__':
     # test_dataloader = obj_dataloader.get_test_dataloader()
 
     # EXIBE OS DADOS
-    image_view=[]
-    for image, target  in train_dataloader:
-        for i in range(BATCH_SIZE):
-            try:
-                image_np = image.detach().cpu().numpy()[i].transpose(1, 2, 0)
-                image_view.append([image_np,target[i]])
-            except:
-                print('Sua base encontra-se com alguma classe desbalanceada!')
-    
-    for image in image_view:
-        cv2.imshow(image[1], image[0])
-        if cv2.waitKey(0) == ord('q'):
-            break 
+    EPOCAS=3
+    for i in range(EPOCAS):
+        image_view=[]
+        for image, target  in train_dataloader:
+            for i in range(BATCH_SIZE):
+                try:
+                    image_np = image.detach().cpu().numpy()[i].transpose(1, 2, 0)
+                    image_view.append([image_np,target[i]])
+                except:
+                    print('Sua base encontra-se com alguma classe desbalanceada!')
+        
+        for image in image_view:
+            cv2.imshow(image[1], image[0])
+            if cv2.waitKey(0) == ord('q'):
+                break 
         
