@@ -2,6 +2,10 @@
 import Load
 import cv2
 import numpy as np
+import torch.nn as nn 
+import torch.optim as optim
+from tqdm import tqdm
+
 if __name__ == '__main__':
    
     DATASET='data_set'
@@ -15,23 +19,33 @@ if __name__ == '__main__':
         obj_dataloader.reorganize_dataset(CLASSE_DIR, CLASSE_DIR, 0.2)
 
     train_dataloader = obj_dataloader.get_train_dataloader()
-    # val_dataloader = obj_dataloader.get_val_dataloader()
-    # test_dataloader = obj_dataloader.get_test_dataloader()
-
+    val_dataloader = obj_dataloader.get_val_dataloader()
+    test_dataloader = obj_dataloader.get_test_dataloader()
+    
+    model = Load.models.MyModel(num_classes=2)
+    criterio = nn.CrossEntropyLoss()
+ 
+    otimizador = optim.Adam(model.parameters(),lr=0.001)
+    
     # EXIBE OS DADOS
     EPOCAS=3
-    for i in range(EPOCAS):
+    for epoca in range(EPOCAS):
         image_view=[]
-        for image, target  in train_dataloader:
-            for i in range(BATCH_SIZE):
-                try:
-                    image_np = image.detach().cpu().numpy()[i].transpose(1, 2, 0)
-                    image_view.append([image_np,target[i]])
-                except:
-                    print('Sua base encontra-se com alguma classe desbalanceada!')
+        model.train()
+        running_loss=[]
+        train_sample = tqdm(train_dataloader)
+
+        for image, target  in train_sample:
+            
+            otimizador.zero_grad()
+            output = model(image)
+            loss = criterio(output, target)
+            otimizador.step()
+            running_loss.append(loss.item())
+            train_sample.set_description(f' Epoca {epoca +1}/{EPOCAS}, loss: {np.mean(running_loss):0.3f}')
+        model.eval()
+
+        val_samples = tqdm(val_dataloader)
         
-        for image in image_view:
-            cv2.imshow(image[1], image[0])
-            if cv2.waitKey(0) == ord('q'):
-                break 
-        
+        for image, mask in val_samples:
+            pass

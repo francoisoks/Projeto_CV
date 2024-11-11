@@ -3,9 +3,9 @@ import shutil
 import random
 import cv2
 from glob import glob
+import torch
 from torch.utils.data import Dataset, DataLoader, Subset
-# não usei
-#from tqdm import tqdm
+from tqdm import tqdm
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import matplotlib.pyplot as plt
@@ -18,7 +18,7 @@ class Data(Dataset):
         self._image_path = glob(f'{image_dir}/{split}/**/*.jpg', recursive=True)
         self._transform = transform
         self._split = split 
-        self._targets = self._get_targets() 
+        self._targets, self._class_to_idx = self._get_targets() 
          
              
     def __len__(self) -> int:
@@ -33,14 +33,20 @@ class Data(Dataset):
          
         if self._transform:
             augmented_image  = self._transform(image=image)['image']
-        return augmented_image,  target
+            
+        augmented_image = augmented_image.float()  # Converte para float32
+    
+        return augmented_image,  torch.tensor(target, dtype=torch.long)
     
     def _get_targets(self) -> list:
         targets = []
+        class_names = sorted({os.path.basename(os.path.dirname(img)) for img in self._image_path})
+        class_to_idx = {name: idx for idx, name in enumerate(class_names)}
+        
         for image in self._image_path:
-            target =  os.path.basename(os.path.dirname(image))
-            targets.append(target)
-        return targets
+            class_name = os.path.basename(os.path.dirname(image))
+            targets.append(class_to_idx[class_name])
+        return targets, class_to_idx
   
 
 class Dataloader:
@@ -91,6 +97,7 @@ class Dataloader:
     def compose(self) -> dict: 
         process_test = A.Compose([
             A.Resize(height=self._size,width=self._size),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225),p=0.1),# artigo 1
             ToTensorV2()
         ])
         process_train = A.Compose([
@@ -113,8 +120,9 @@ class Dataloader:
 
     def get_dataloader(self, split: str) -> DataLoader:
         # retornar o dataloader baseado no split
+        if split=='val':
+            split='test'
         dataset = Data(self._dir, split, self._transform[split] ) # criando uma instancia de Data 
-       
         if self._subset:
             dataset = Subset(dataset, range(self._subset))
         dataloader = DataLoader(dataset, batch_size=self._batch_size, shuffle=self._shuffle)
