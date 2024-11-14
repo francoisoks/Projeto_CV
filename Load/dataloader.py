@@ -19,7 +19,6 @@ class Data(Dataset):
         self._transform = transform
         self._split = split 
         self._targets, self._class_to_idx = self._get_targets() 
-         
              
     def __len__(self) -> int:
         # retornar a quantidade de dados
@@ -46,6 +45,7 @@ class Data(Dataset):
         for image in self._image_path:
             class_name = os.path.basename(os.path.dirname(image))
             targets.append(class_to_idx[class_name])
+        
         return targets, class_to_idx
   
 
@@ -107,7 +107,7 @@ class Dataloader:
             A.VerticalFlip(p=0.1), # artigo 1
             A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225),p=0.1),# artigo 1
             A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.1),# artigo 3
-            A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.1),# artigo 3
+            #A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.1),# artigo 3
             ToTensorV2()
 
         ])
