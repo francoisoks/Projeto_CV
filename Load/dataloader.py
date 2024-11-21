@@ -28,6 +28,7 @@ class Data(Dataset):
         # retornar image/labels/boox/mask...
         image_path = self._image_path[idx]
         image = cv2.imread(image_path)
+        cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         target=self._targets[idx]
          
         if self._transform:
@@ -97,16 +98,16 @@ class Dataloader:
     def compose(self) -> dict: 
         process_test = A.Compose([
             A.Resize(height=self._size,width=self._size),
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225),p=0.1),# artigo 1
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),# artigo 1
             ToTensorV2()
         ])
         process_train = A.Compose([
-            A.RandomScale(scale_limit=0.1), # Artigo 1
+            A.RandomScale(scale_limit=0.2), # Artigo 1
             A.Resize(height=self._size,width=self._size),
-            A.Rotate(limit=45,p=0.1), # artigo 1
-            A.VerticalFlip(p=0.1), # artigo 1
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225),p=0.1),# artigo 1
-            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.1),# artigo 3
+            A.Rotate(limit=45,p=0.2), # artigo 1
+            A.VerticalFlip(p=0.2), # artigo 1
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),# artigo 1
+            #A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.1),# artigo 3
             #A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.1),# artigo 3
             ToTensorV2()
 
