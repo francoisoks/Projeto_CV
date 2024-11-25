@@ -15,7 +15,7 @@ class EarlyStop:
             if self.counter >= self.patience:
                 self.early_stop = True
         else:
-            self.best_score = loss
+            self.best_loss = loss
             self.counter = 0
+        print(f'count: {self.counter} best: {self.best_loss} delta: {self.delta} patience: {self.patience}')
         return self.early_stop
-
