@@ -2,7 +2,7 @@
 import Load
 from metric import Metrics
 from early import EarlyStop
-
+from tensor import Log
 import cv2
 import numpy as np
 import torch.nn as nn 
@@ -31,26 +31,30 @@ if __name__ == '__main__':
     train_dataloader = obj_dataloader.get_train_dataloader()
     val_dataloader = obj_dataloader.get_val_dataloader()
     test_dataloader = obj_dataloader.get_test_dataloader()
+
+
     try:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model = Load.models.MyModel(num_classes=CLASSES_NUM).to(device)
+        model = Load.models.MyModel().to(device)
 
     except:
-        model = Load.models.MyModel(num_classes=CLASSES_NUM).to(device)
+        model = Load.models.MyModel().to(device)
 
  
-    criterio = nn.CrossEntropyLoss()
+    criterio = nn.BCEWithLogitsLoss()
  
     otimizador = optim.Adam(model.parameters(),lr=0.0001)
     early_stop = EarlyStop(patience=10, delta=0.001)
 
     scheduler = ReduceLROnPlateau(otimizador, mode='min', factor=0.1, patience=3, verbose=True)
-
-    # EXIBE OS DADOS
     
-    val_metrics=Metrics(num_classes=2)
-    train_metrics=Metrics(num_classes=2)
-    result=[]
+    log_train = Log(BATCH_SIZE, 'train')
+    log_val = Log(BATCH_SIZE, 'val')
+    
+    val_metrics=Metrics()
+    train_metrics=Metrics()
+    result_loss=[]
+
     for epoca in range(EPOCAS):
         
         train_loss=[]
@@ -73,11 +77,12 @@ if __name__ == '__main__':
 
             train_loss.append(loss.item())
             try:
-                train_preds = torch.argmax(output, dim=1).cpu().numpy()
+                train_preds = (output > 0.5).int().cpu().numpy()
                 train_targets = target.cpu().numpy()
             except:
-                train_preds = torch.argmax(output, dim=1)
+                train_preds = (output > 0.5).int().numpy()
                 train_targets = target.numpy()
+
             train_metrics.add_predictions(train_targets, train_preds, loss.item())
 
             train_sample.set_description(f' Epoca {epoca+1}/{EPOCAS}, loss: {np.mean(train_loss):0.8f}')
@@ -89,6 +94,8 @@ if __name__ == '__main__':
 
         with torch.no_grad():
             for image, target in val_dataloader:
+                log_val.log_image(image, epoca, path="Validation Images")
+
                 try:
                     image, target = image.to(device), target.to(device)
                 except:
@@ -97,30 +104,44 @@ if __name__ == '__main__':
                 loss = criterio(output, target)
                 val_loss.append(loss.item())
                 try:
-                    val_preds = torch.argmax(output, dim=1).cpu().numpy()
+                    val_preds = (output > 0.5).int().cpu().numpy()
                     val_targets = target.cpu().numpy()
                 except:
-                    val_preds = torch.argmax(output, dim=1)
+                    val_preds = (output > 0.5).int().numpy()
                     val_targets = target.numpy()
                 val_metrics.add_predictions(val_targets, val_preds, loss.item())
 
 
         train_results  = train_metrics.calc_metrics()
         val_results  = val_metrics.calc_metrics()
-        result.append((train_results['loss'],train_results['balanced_acc'],train_results['f1_score'],val_results['loss'],val_results['balanced_acc'],val_results['f1_score'], otimizador.param_groups[0]['lr'] ))              
+
+        result_loss.append(val_results['loss'])
+
+        result_loss.append(val_results['loss'])
+
         scheduler.step(np.mean(val_results['loss']))
         
-        print(
-                f"Época {epoca + 1}/{EPOCAS}: "
-                f"\nTrain Loss: {train_results['loss']:.4f}, Train Balanced Acc: {train_results['balanced_acc']:.4f}, "
-                f"\nTrain F1: {train_results['f1_score']:.4f}, Train Recall: {train_results['recall']:.4f} | "
-                f"\nVal Loss: {val_results['loss']:.4f}, Val Balanced Acc: {val_results['balanced_acc']:.4f}, "
-                f"\nVal F1: {val_results['f1_score']:.4f}, Val Recall: {val_results['recall']:.4f}"
-            )
+        log_train.log_metrics(train_results['loss'], epoca,  scalar_name='loss')
+        log_val.log_metrics(val_results['loss'], epoca, scalar_name='loss')
+        
+        log_train.log_metrics(train_results['balanced_acc'], epoca, scalar_name='balanced_acc')
+        log_val.log_metrics(val_results['balanced_acc'], epoca,  scalar_name='balanced_acc')
+        
+        log_train.log_metrics(train_results['f1_score'], epoca, scalar_name='f1_score')
+        log_val.log_metrics(val_results['f1_score'], epoca,  scalar_name='f1_score')
+
+
+        log_train.log_metrics(train_results['recall'], epoca, scalar_name='recall')
+        log_val.log_metrics(val_results['recall'], epoca,  scalar_name='recall')
+
+        log_train.log_hiper(early_stop.get_counter(),epoca,'Early_count')
+        log_train.log_hiper(scheduler.get_last_lr()[-1],epoca,'LR')
+
+
         if early_stop.check(val_results['loss']):
             print(f"Parada antecipada na época {epoca}")
             break
          
-    with open('list.txt', 'w') as f:
-        f.write(str(result))        
+    log_train.close()
+    log_val.close()    
    

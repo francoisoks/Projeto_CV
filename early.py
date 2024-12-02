@@ -17,5 +17,11 @@ class EarlyStop:
         else:
             self.best_loss = loss
             self.counter = 0
-        print(f'count: {self.counter} best: {self.best_loss} delta: {self.delta} patience: {self.patience}')
+            
+        print(f'count: {self.counter} best: {self.best_loss}')
         return self.early_stop
+
+    def get_counter(self):
+             return self.counter
+        
+
